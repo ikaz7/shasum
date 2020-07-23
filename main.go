@@ -15,13 +15,18 @@ var s384 = flag.Bool("384", false, "print sha384")
 func main() {
 	flag.Parse()
 	input := flag.Args()
-	ch := make(chan struct{})
+	var tokens = make(chan struct{}, 200)
+	var ch = make(chan struct{})
+
 	for _, file := range input {
 		go func(f string) {
+			tokens <- struct{}{}
 			b, err := ioutil.ReadFile(f)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "shasum: %v\n", err)
-				os.Exit(1)
+				<-tokens
+				ch <- struct{}{}
+				return
 			}
 			switch {
 			case *s512:
@@ -34,6 +39,7 @@ func main() {
 				digest := sha256.Sum256(b)
 				fmt.Printf("%x\t%s\n", digest, f)
 			}
+			<-tokens
 			ch <- struct{}{}
 		}(file)
 	}
